@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Through You 01（動的な風景ドット絵）</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .element {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background: white;
+            transition: transform 2s, background 1s, opacity 1s;
+            filter: blur(5px);
+        }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h3>操作方法</h3>
+        <ul>
+            <li>マウス移動: 背景色と和音の一音が変化</li>
+            <li>左クリック: カラフルなドットを生成</li>
+            <li>右クリック: ランダムなドットを削除</li>
+            <li>スクロール: ドットのサイズを拡大・縮小</li>
+            <li>左ドラッグ: カラフルなドットを生成しながら移動</li>
+            <li>ホイールドラッグ: すべてのドットがランダムに移動</li>
+            <li>右ドラッグ: すべてのドットの透明度が徐々に変化</li>
+            <li>スペースキー: 音のON/OFFを切り替え</li>
+        </ul>
+    </div>
+    <script>
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let gainNode = audioCtx.createGain();
+        let oscillators = [];
+        let baseFrequencies = [261.63, 329.63, 392.00, 466.16]; // C, E, G, Bb (C7)
+        let isAudioPlaying = true;
+        
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.connect(audioCtx.destination);
+        
+        baseFrequencies.forEach((freq, i) => {
+            let osc = audioCtx.createOscillator();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.connect(gainNode);
+            osc.start();
+            oscillators.push(osc);
+        });
+        
+        function toggleAudio() {
+            gainNode.gain.setValueAtTime(isAudioPlaying ? 0 : 0.1, audioCtx.currentTime);
+            isAudioPlaying = !isAudioPlaying;
+        }
+
+        function createElement(color, x, y) {
+            let div = document.createElement("div");
+            div.classList.add("element");
+            div.style.background = color || "rgba(255, 255, 255, 0.8)";
+            document.body.appendChild(div);
+            div.style.left = (x || Math.random() * window.innerWidth) + "px";
+            div.style.top = (y || Math.random() * window.innerHeight) + "px";
+            moveAndChange(div);
+            return div;
+        }
+        
+        function moveAndChange(element) {
+            setInterval(() => {
+                element.style.transform = `translate(${Math.random() * 100 - 50}px, ${Math.random() * 100 - 50}px)`;
+            }, 3000);
+        }
+        
+        for (let i = 0; i < 20; i++) {
+            let colors = ["#3b5998", "#2e8b57", "#8b4513", "#1e90ff", "#4682b4"];
+            createElement(colors[i % colors.length]);
+        }
+        
+        document.addEventListener("mousemove", (e) => {
+            let x = e.clientX / window.innerWidth * 255;
+            let y = e.clientY / window.innerHeight * 255;
+            document.body.style.backgroundColor = `rgb(${x}, ${y}, ${255 - x})`;
+            
+            let noteIndex = Math.floor((e.clientX / window.innerWidth) * baseFrequencies.length);
+            let newFreq = baseFrequencies[noteIndex] + (y * 0.5);
+            oscillators[noteIndex].frequency.setValueAtTime(newFreq, audioCtx.currentTime);
+        });
+        
+        document.addEventListener("click", (e) => {
+            let color = `rgb(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255})`;
+            createElement(color, e.clientX, e.clientY);
+        });
+        
+        document.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            let elements = document.querySelectorAll(".element");
+            if (elements.length > 0) {
+                elements[Math.floor(Math.random() * elements.length)].remove();
+            }
+        });
+        
+        document.addEventListener("wheel", (e) => {
+            let elements = document.querySelectorAll(".element");
+            let scaleFactor = e.deltaY * -0.05;
+            elements.forEach(el => {
+                let currentSize = parseFloat(el.style.width) || 100;
+                let newSize = currentSize * (1 + scaleFactor);
+                newSize = Math.max(20, Math.min(newSize, 5000));
+                el.style.width = newSize + "px";
+                el.style.height = newSize + "px";
+            });
+        });
+
+        let isLeftDragging = false;
+        let isMiddleDragging = false;
+        let isRightDragging = false;
+        
+        document.addEventListener("mousedown", (e) => {
+            if (e.button === 0) isLeftDragging = true;
+            if (e.button === 1) isMiddleDragging = true;
+            if (e.button === 2) isRightDragging = true;
+        });
+        document.addEventListener("mouseup", (e) => {
+            if (e.button === 0) isLeftDragging = false;
+            if (e.button === 1) isMiddleDragging = false;
+            if (e.button === 2) isRightDragging = false;
+        });
+        
+        document.addEventListener("mousemove", (e) => {
+            if (isLeftDragging) {
+                let color = `rgb(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255})`;
+                createElement(color, e.clientX, e.clientY);
+            }
+            if (isMiddleDragging) {
+                document.querySelectorAll(".element").forEach(el => {
+                    el.style.transform = `translate(${Math.random() * 5000 - 2500}px, ${Math.random() * 5000 - 2500}px)`;
+                });
+            }
+            if (isRightDragging) {
+                document.querySelectorAll(".element").forEach(el => {
+                    let currentOpacity = parseFloat(el.style.opacity) || 1;
+                    let targetOpacity = Math.random() * 0.5 + 0.5;
+                    el.style.transition = "opacity 0.5s";
+                    el.style.opacity = targetOpacity;
+                });
+                gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.5);
+                setTimeout(() => gainNode.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.5), 500);
+            }
+        });
+
+        document.addEventListener("click", () => {
+            if (audioCtx.state === "suspended") {
+                audioCtx.resume();
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.code === "Space") {
+                toggleAudio();
+            }
+        });
+
+        document.addEventListener("mousedown", (e) => {
+            if (e.button === 1) { // ホイールクリック（ミドルボタン）
+                let elements = document.querySelectorAll(".element");
+                elements.forEach(el => {
+                    el.style.transition = "transform 0.5s ease-out";
+                    let randomX = Math.random() * window.innerWidth;
+                    let randomY = Math.random() * window.innerHeight;
+                    el.style.transform = `translate(${randomX - el.offsetLeft}px, ${randomY - el.offsetTop}px)`;
+                });
+            }
+        });
+
+    </script>
+</body>
+</html>
